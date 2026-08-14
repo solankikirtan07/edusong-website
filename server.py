@@ -1,6 +1,6 @@
 from flask import Flask, request, send_file
 from flask_cors import CORS
-import pyttsx3
+from gtts import gTTS
 from pydub import AudioSegment
 from pydub.generators import Sine
 
@@ -12,21 +12,21 @@ def generate_song():
     data = request.get_json()
     text = data.get('text', '')
 
-    # Voice banao
-    engine = pyttsx3.init()
-    engine.setProperty('rate', 150)
-    engine.save_to_file(text, 'voice.wav')
-    engine.runAndWait()
+    # Voice banao (Google TTS)
+    tts = gTTS(text=text, lang='en')
+    tts.save('voice.mp3')
 
     # Background music banao
     background = Sine(440).to_audio_segment(duration=8000).apply_gain(-20)
 
-    # Mix karo
-    voice = AudioSegment.from_wav('voice.wav')
+    # Voice ko mix karo
+    voice = AudioSegment.from_mp3('voice.mp3')
     final_song = background.overlay(voice)
     final_song.export('edusong_output.wav', format='wav')
 
     return send_file('edusong_output.wav', mimetype='audio/wav')
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    import os
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
