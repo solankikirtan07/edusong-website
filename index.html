@@ -40,6 +40,10 @@
       button:hover {
         background-color: #4b0082;
       }
+      button:disabled {
+        background-color: #aaa;
+        cursor: not-allowed;
+      }
       #inputSection {
         display: none;
       }
@@ -64,12 +68,17 @@
         placeholder="Jaise: Photosynthesis is the process..."
       ></textarea>
       <br />
-      <button onclick="generateSong()">Generate Song</button>
-      <p id="loadingText">Song ban raha hai, thoda wait karo...</p>
+      <button id="generateBtn" onclick="generateSong()">Generate Song</button>
+      <p id="loadingText">
+        Song ban raha hai, thoda wait karo (pehli baar 30-50 sec lag sakte
+        hain)...
+      </p>
       <audio id="audioPlayer" controls style="display: none"></audio>
     </div>
 
     <script>
+      const BACKEND_URL = "https://edusong-website.onrender.com";
+
       function showInput() {
         document.getElementById("inputSection").style.display = "block";
       }
@@ -81,25 +90,35 @@
           return;
         }
 
+        var btn = document.getElementById("generateBtn");
+        btn.disabled = true;
         document.getElementById("loadingText").style.display = "block";
         document.getElementById("audioPlayer").style.display = "none";
 
-        fetch("https://edusong-website.onrender.com/generate", {
+        fetch(BACKEND_URL + "/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: text }),
         })
-          .then((response) => response.blob())
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Server error: " + response.status);
+            }
+            return response.blob();
+          })
           .then((blob) => {
             var url = URL.createObjectURL(blob);
             var player = document.getElementById("audioPlayer");
             player.src = url;
             player.style.display = "block";
+            player.play();
             document.getElementById("loadingText").style.display = "none";
+            btn.disabled = false;
           })
           .catch((error) => {
-            alert("Error aaya: " + error);
+            alert("Error aaya: " + error.message);
             document.getElementById("loadingText").style.display = "none";
+            btn.disabled = false;
           });
       }
     </script>

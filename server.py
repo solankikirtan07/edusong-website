@@ -3,46 +3,61 @@ from flask_cors import CORS
 from gtts import gTTS
 from pydub import AudioSegment
 from pydub.generators import Sine
+import os
 
 app = Flask(__name__)
 CORS(app)
 
-def create_melody():
-    # Ek chhota chord progression banate hain (C - Am - F - G jaisa feel)
-    notes = [261, 293, 329, 349, 392, 349, 329, 293]  # C D E F G F E D scale-ish notes
+def create_fallback_melody(duration_ms):
+    """Agar background.mp3 file na mile, to ek pleasant melody generate karo (beep se better)."""
+    notes = [261, 293, 329, 349, 392, 440, 392, 349]  # C D E F G A G F
     melody = AudioSegment.silent(duration=0)
-    for note in notes:
-        tone = Sine(note).to_audio_segment(duration=1000).apply_gain(-18)
-        # Thoda fade laga do taaki smooth lage
-        tone = tone.fade_in(50).fade_out(100)
-        melody += tone
-    return melody
+    while len(melody) < duration_ms + 2000:
+        for note in notes:
+            tone = Sine(note).to_audio_segment(duration=600).apply_gain(-20)
+            tone = tone.fade_in(30).fade_out(150)
+            melody += tone
+    return melody[:duration_ms + 2000]
 
 @app.route('/generate', methods=['POST'])
 def generate_song():
     data = request.get_json()
     text = data.get('text', '')
 
-    # Voice banao (Google TTS)
-    tts = gTTS(text=text, lang='en')
-    tts.save('voice.mp3')
+    if not text or not text.strip():
+        return {"error": "Text is empty"}, 400
 
+    # Step 1: Voice banao (Google TTS - natural sounding)
+    tts = gTTS(text=text, lang='en', slow=False)
+    tts.save('voice.mp3')
     voice = AudioSegment.from_mp3('voice.mp3')
 
-    # Melody banao, voice jitni lambi loop karo
-    melody = create_melody()
-    background = melody
-    while len(background) < len(voice) + 1000:
-        background += melody
-    background = background[:len(voice) + 1000].apply_gain(-8)
+    # Step 2: Background music - real file use karo agar available hai
+    if os.path.exists('background.mp3'):
+        music = AudioSegment.from_mp3('background.mp3')
+    else:
+        music = create_fallback_melody(len(voice))
 
-    # Mix karo
-    final_song = background.overlay(voice)
-    final_song.export('edusong_output.wav', format='wav')
+    # Step 3: Music ko voice ki length tak loop karo
+    background = AudioSegment.silent(duration=0)
+    while len(background) < len(voice) + 1500:
+        background += music
+    background = background[:len(voice) + 1500]
 
-    return send_file('edusong_output.wav', mimetype='audio/wav')
+    # Step 4: Volume balance - music halka, voice clear
+    background = background.apply_gain(-14)
+    voice = voice.apply_gain(+2)
+
+    # Step 5: Voice ko thoda center mein start karo aur mix karo
+    final_song = background.overlay(voice, position=500)
+
+    # Step 6: Fade in/out for polish
+    final_song = final_song.fade_in(500).fade_out(1000)
+
+    final_song.export('edusong_output.mp3', format='mp3')
+
+    return send_file('edusong_output.mp3', mimetype='audio/mpeg')
 
 if __name__ == '__main__':
-    import os
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=True, host='0.0.0.0', port=port)
