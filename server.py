@@ -7,6 +7,17 @@ from pydub.generators import Sine
 app = Flask(__name__)
 CORS(app)
 
+def create_melody():
+    # Ek chhota chord progression banate hain (C - Am - F - G jaisa feel)
+    notes = [261, 293, 329, 349, 392, 349, 329, 293]  # C D E F G F E D scale-ish notes
+    melody = AudioSegment.silent(duration=0)
+    for note in notes:
+        tone = Sine(note).to_audio_segment(duration=1000).apply_gain(-18)
+        # Thoda fade laga do taaki smooth lage
+        tone = tone.fade_in(50).fade_out(100)
+        melody += tone
+    return melody
+
 @app.route('/generate', methods=['POST'])
 def generate_song():
     data = request.get_json()
@@ -16,11 +27,16 @@ def generate_song():
     tts = gTTS(text=text, lang='en')
     tts.save('voice.mp3')
 
-    # Background music banao
-    background = Sine(440).to_audio_segment(duration=8000).apply_gain(-20)
-
-    # Voice ko mix karo
     voice = AudioSegment.from_mp3('voice.mp3')
+
+    # Melody banao, voice jitni lambi loop karo
+    melody = create_melody()
+    background = melody
+    while len(background) < len(voice) + 1000:
+        background += melody
+    background = background[:len(voice) + 1000].apply_gain(-8)
+
+    # Mix karo
     final_song = background.overlay(voice)
     final_song.export('edusong_output.wav', format='wav')
 
