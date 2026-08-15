@@ -84,7 +84,7 @@
         document.getElementById("loadingText").style.display = "block";
         document.getElementById("audioPlayer").style.display = "none";
 
-        fetch('https://edusong-website.onrender.com/generate', {, {
+        fetch("https://edusong-website.onrender.com/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: text }),
